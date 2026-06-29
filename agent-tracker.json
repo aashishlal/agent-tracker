@@ -16,7 +16,7 @@
     },
     {
       "name": "Antigravity",
-      "command": "cd \"/Users/aashishlal/Documents/Agent Tracker\" && /Users/aashishlal/.local/bin/agy /usage",
+      "command": "/Users/aashishlal/.local/bin/agy /usage",
       "metrics": [
         {
           "label": "Gemini Weekly",
@@ -38,7 +38,7 @@
     },
     {
       "name": "Command Code",
-      "command": "cd \"/Users/aashishlal/Documents/Agent Tracker\" && /opt/homebrew/bin/cmd -p '/usage' < /dev/null",
+      "command": "/opt/homebrew/bin/cmd -p '/usage' < /dev/null",
       "metrics": [
         {
           "label": "Cycle Usage",

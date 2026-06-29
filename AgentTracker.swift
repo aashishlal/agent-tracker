@@ -238,8 +238,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let task = Process()
         let pipe = Pipe()
         
-        let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
-        task.currentDirectoryPath = homeDir
+        let projectDir = "/Users/aashishlal/Documents/Agent Tracker"
+        if FileManager.default.fileExists(atPath: projectDir) {
+            task.currentDirectoryPath = projectDir
+        } else {
+            task.currentDirectoryPath = FileManager.default.homeDirectoryForCurrentUser.path
+        }
         task.standardOutput = pipe
         task.standardError = pipe
         task.arguments = ["-c", command]
