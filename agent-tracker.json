@@ -16,23 +16,23 @@
     },
     {
       "name": "Antigravity",
-      "command": "cd \"/Users/aashishlal/Documents/Agent Tracker\" && /Users/aashishlal/.local/bin/agy -p '/usage' < /dev/null",
+      "command": "cd \"/Users/aashishlal/Documents/Agent Tracker\" && /Users/aashishlal/.local/bin/agy /usage",
       "metrics": [
         {
           "label": "Gemini Weekly",
-          "regex": "GEMINI MODELS(?:(?!CLAUDE)[\\s\\S])*?Weekly Limit[\\s\\S]*?(\\d+%\\s*remaining[^\\n]*|[0-9.]+%|Quota available)"
+          "regex": "GEMINI MODELS(?:(?!CLAUDE)[\\s\\S])*?Weekly Limit\\s*\\n\\s*([^\\n]+)"
         },
         {
           "label": "Gemini 5-Hour",
-          "regex": "GEMINI MODELS(?:(?!CLAUDE)[\\s\\S])*?Five Hour Limit[\\s\\S]*?(\\d+%\\s*remaining[^\\n]*|[0-9.]+%|Quota available)"
+          "regex": "GEMINI MODELS(?:(?!CLAUDE)[\\s\\S])*?Five Hour Limit\\s*\\n\\s*([^\\n]+)"
         },
         {
           "label": "Claude Weekly",
-          "regex": "CLAUDE AND GPT MODELS[\\s\\S]*?Weekly Limit[\\s\\S]*?(\\d+%\\s*remaining[^\\n]*|[0-9.]+%|Quota available)"
+          "regex": "CLAUDE AND GPT MODELS[\\s\\S]*?Weekly Limit\\s*\\n\\s*([^\\n]+)"
         },
         {
           "label": "Claude 5-Hour",
-          "regex": "CLAUDE AND GPT MODELS[\\s\\S]*?Five Hour Limit[\\s\\S]*?(\\d+%\\s*remaining[^\\n]*|[0-9.]+%|Quota available)"
+          "regex": "CLAUDE AND GPT MODELS[\\s\\S]*?Five Hour Limit\\s*\\n\\s*([^\\n]+)"
         }
       ]
     },
@@ -42,15 +42,15 @@
       "metrics": [
         {
           "label": "Cycle Usage",
-          "regex": "([0-9]+%) used"
+          "regex": "([█░]+\\s*[0-9]+%\\s*used)"
         },
         {
           "label": "Weekly Limit",
-          "regex": "Weekly\\s+[^\\n]*?([0-9]+%)"
+          "regex": "Weekly\\s+([^\\n]+)"
         },
         {
           "label": "5-hour Limit",
-          "regex": "5-hour\\s+[^\\n]*?([0-9]+%)"
+          "regex": "5-hour\\s+([^\\n]+)"
         }
       ]
     }

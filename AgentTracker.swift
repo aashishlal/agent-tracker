@@ -443,44 +443,45 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Dynamic Configuration Actions
     
     @objc func onAddToolDialog() {
-        let alert = NSAlert()
-        alert.messageText = "Add Custom CLI Tool"
-        alert.informativeText = "Enter the configuration details for the new CLI tool:"
-        alert.addButton(withTitle: "Add")
-        alert.addButton(withTitle: "Cancel")
-        
-        // Create form view
-        let nameField = NSTextField(frame: NSRect(x: 0, y: 90, width: 280, height: 24))
-        nameField.placeholderString = "Tool Name (e.g. Claude Code)"
-        
-        let cmdField = NSTextField(frame: NSRect(x: 0, y: 60, width: 280, height: 24))
-        cmdField.placeholderString = "CLI Command (e.g. /usr/local/bin/my-tool --usage)"
-        
-        let labelField = NSTextField(frame: NSRect(x: 0, y: 30, width: 280, height: 24))
-        labelField.placeholderString = "Metric Label (e.g. Daily limit)"
-        
-        let regexField = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
-        regexField.placeholderString = "Regex to extract value (e.g. (\\d+%))"
-        
-        let container = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: 114))
-        container.addSubview(nameField)
-        container.addSubview(cmdField)
-        container.addSubview(labelField)
-        container.addSubview(regexField)
-        
-        alert.accessoryView = container
-        
-        // Activate app to bring dialog to front
-        NSApp.activate(ignoringOtherApps: true)
-        
-        if alert.runModal() == .alertFirstButtonReturn {
-            let name = nameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            let command = cmdField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            let label = labelField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            let regex = regexField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = "Add Custom CLI Tool"
+            alert.informativeText = "Enter the configuration details for the new CLI tool:"
+            alert.addButton(withTitle: "Add")
+            alert.addButton(withTitle: "Cancel")
             
-            if !name.isEmpty && !command.isEmpty && !label.isEmpty && !regex.isEmpty {
-                addToolToConfig(name: name, command: command, label: label, regex: regex)
+            // Create form view
+            let nameField = NSTextField(frame: NSRect(x: 0, y: 90, width: 280, height: 24))
+            nameField.placeholderString = "Tool Name (e.g. Claude Code)"
+            
+            let cmdField = NSTextField(frame: NSRect(x: 0, y: 60, width: 280, height: 24))
+            cmdField.placeholderString = "CLI Command (e.g. /usr/local/bin/my-tool --usage)"
+            
+            let labelField = NSTextField(frame: NSRect(x: 0, y: 30, width: 280, height: 24))
+            labelField.placeholderString = "Metric Label (e.g. Daily limit)"
+            
+            let regexField = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
+            regexField.placeholderString = "Regex to extract value (e.g. (\\d+%))"
+            
+            let container = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: 114))
+            container.addSubview(nameField)
+            container.addSubview(cmdField)
+            container.addSubview(labelField)
+            container.addSubview(regexField)
+            
+            alert.accessoryView = container
+            
+            NSApp.activate(ignoringOtherApps: true)
+            
+            if alert.runModal() == .alertFirstButtonReturn {
+                let name = nameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                let command = cmdField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                let label = labelField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                let regex = regexField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                if !name.isEmpty && !command.isEmpty && !label.isEmpty && !regex.isEmpty {
+                    self.addToolToConfig(name: name, command: command, label: label, regex: regex)
+                }
             }
         }
     }
@@ -488,16 +489,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func onRemoveToolItem(_ sender: NSMenuItem) {
         guard let name = sender.representedObject as? String else { return }
         
-        let alert = NSAlert()
-        alert.messageText = "Remove Tool"
-        alert.informativeText = "Are you sure you want to remove '\(name)' from the tracker?"
-        alert.addButton(withTitle: "Remove")
-        alert.addButton(withTitle: "Cancel")
-        
-        NSApp.activate(ignoringOtherApps: true)
-        
-        if alert.runModal() == .alertFirstButtonReturn {
-            removeToolFromConfig(name: name)
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = "Remove Tool"
+            alert.informativeText = "Are you sure you want to remove '\(name)' from the tracker?"
+            alert.addButton(withTitle: "Remove")
+            alert.addButton(withTitle: "Cancel")
+            
+            NSApp.activate(ignoringOtherApps: true)
+            
+            if alert.runModal() == .alertFirstButtonReturn {
+                self.removeToolFromConfig(name: name)
+            }
         }
     }
     
