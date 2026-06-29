@@ -27,6 +27,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var toolResults: [String: [String: String]] = [:]
     var isRefreshing = false
     var hasAlertedClaude = false
+    var workspacePath = ""
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Setup status item
@@ -48,12 +49,45 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Load initial config
         loadConfig()
         
+        // Setup temp workspace
+        setupTempWorkspace()
+        
         // Initial refresh
         refreshData()
         
         // Setup timer to refresh every 10 minutes
         Timer.scheduledTimer(withTimeInterval: 600.0, repeats: true) { [weak self] _ in
             self?.refreshData()
+        }
+    }
+    
+    func setupTempWorkspace() {
+        let fm = FileManager.default
+        guard let appSupportURL = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
+        
+        let folderName = Bundle.main.bundleIdentifier ?? "com.aashishlal.AgentTracker"
+        let pathURL = appSupportURL.appendingPathComponent(folderName).appendingPathComponent("agent_tracker_workspace")
+        let path = pathURL.path
+        self.workspacePath = path
+        
+        if !fm.fileExists(atPath: path) {
+            do {
+                try fm.createDirectory(atPath: path, withIntermediateDirectories: true, attributes: nil)
+            } catch {
+                print("Failed to create workspace: \(error)")
+            }
+        }
+        
+        if fm.fileExists(atPath: path) && !fm.fileExists(atPath: "\(path)/.git") {
+            let task = Process()
+            let pipe = Pipe()
+            task.standardOutput = pipe
+            task.standardError = pipe
+            task.currentDirectoryPath = path
+            task.arguments = ["-c", "git init && git remote add origin https://github.com/aashishlal/agent-tracker.git"]
+            task.launchPath = "/bin/zsh"
+            try? task.run()
+            task.waitUntilExit()
         }
     }
     
@@ -243,9 +277,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:\(currentPath)"
         task.environment = env
         
-        let projectDir = "/Users/aashishlal/Documents/Agent Tracker"
-        if FileManager.default.fileExists(atPath: projectDir) {
-            task.currentDirectoryPath = projectDir
+        if !workspacePath.isEmpty && FileManager.default.fileExists(atPath: workspacePath) {
+            task.currentDirectoryPath = workspacePath
         } else {
             task.currentDirectoryPath = FileManager.default.homeDirectoryForCurrentUser.path
         }
@@ -274,7 +307,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         timer.cancel()
         
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8) ?? ""
+        let result = String(data: data, encoding: .utf8) ?? ""
+        
+        // Write to /tmp/agent_tracker_debug.log
+        let logMessage = "--- COMMAND: \(command) ---\nOutput:\n\(result)\n-------------------------\n"
+        if let logData = logMessage.data(using: .utf8) {
+            let logPath = "/tmp/agent_tracker_debug.log"
+            if !FileManager.default.fileExists(atPath: logPath) {
+                FileManager.default.createFile(atPath: logPath, contents: logData, attributes: nil)
+            } else if let fileHandle = FileHandle(forWritingAtPath: logPath) {
+                fileHandle.seekToEndOfFile()
+                fileHandle.write(logData)
+                fileHandle.closeFile()
+            }
+        }
+        
+        return result
     }
     
     func extractValue(from text: String, regexPattern: String) -> String? {

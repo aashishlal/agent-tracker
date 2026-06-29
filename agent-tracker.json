@@ -16,7 +16,7 @@
     },
     {
       "name": "Antigravity",
-      "command": "/Users/aashishlal/.local/bin/agy /usage",
+      "command": "/Users/aashishlal/.local/bin/agy -p '/usage'",
       "metrics": [
         {
           "label": "Gemini Weekly",
