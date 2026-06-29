@@ -34,7 +34,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         if let button = statusItem?.button {
             button.imagePosition = .imageOnly
-            setButtonImage(open: false)
+            setButtonImage(open: true)
             
             // Setup tracking area for hover state
             let trackingArea = NSTrackingArea(rect: button.bounds,
@@ -93,11 +93,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // Mouse hover tracking
     @objc func mouseEntered(with event: NSEvent) {
-        setButtonImage(open: true)
+        setButtonImage(open: false)
     }
     
     @objc func mouseExited(with event: NSEvent) {
-        setButtonImage(open: false)
+        setButtonImage(open: true)
     }
     
     func loadConfig() {
@@ -134,11 +134,49 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 let output = self.runShell(tool.command)
                 var metricsResults: [String: String] = [:]
                 
-                for metric in tool.metrics {
-                    if let value = self.extractValue(from: output, regexPattern: metric.regex) {
-                        metricsResults[metric.label] = value
-                    } else {
-                        metricsResults[metric.label] = "N/A"
+                let cleanedOutput = output.trimmingCharacters(in: .whitespacesAndNewlines)
+                if tool.name == "Antigravity" && cleanedOutput.hasPrefix("{") {
+                    if let data = cleanedOutput.data(using: .utf8) {
+                        struct AgyModel: Decodable {
+                            let label: String
+                            let modelId: String
+                            let remainingPercentage: Double?
+                        }
+                        struct AgyQuota: Decodable {
+                            let models: [AgyModel]?
+                        }
+                        
+                        do {
+                            let decoded = try JSONDecoder().decode(AgyQuota.self, from: data)
+                            if let models = decoded.models {
+                                if let geminiModel = models.first(where: { $0.modelId.contains("gemini") }),
+                                   let remaining = geminiModel.remainingPercentage {
+                                    let pct = Int(remaining * 100)
+                                    metricsResults["Gemini Quota"] = "\(pct)% remaining"
+                                }
+                                if let claudeModel = models.first(where: { $0.modelId.contains("claude") }),
+                                   let remaining = claudeModel.remainingPercentage {
+                                    let pct = Int(remaining * 100)
+                                    metricsResults["Claude Quota"] = "\(pct)% remaining"
+                                }
+                            }
+                        } catch {
+                            print("Failed to parse Antigravity JSON: \(error)")
+                        }
+                    }
+                }
+                
+                if metricsResults.isEmpty {
+                    for metric in tool.metrics {
+                        if let value = self.extractValue(from: output, regexPattern: metric.regex) {
+                            metricsResults[metric.label] = value
+                        } else {
+                            if output.contains("expired") || output.contains("login") || output.contains("login again") || output.contains("Failed to fetch") {
+                                metricsResults[metric.label] = "Login required"
+                            } else {
+                                metricsResults[metric.label] = "N/A"
+                            }
+                        }
                     }
                 }
                 
@@ -199,6 +237,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let task = Process()
         let pipe = Pipe()
         
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
+        task.currentDirectoryPath = homeDir
         task.standardOutput = pipe
         task.standardError = pipe
         task.arguments = ["-c", command]
@@ -381,18 +421,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
-        // 3. Link Accounts section
-        let linkSectionItem = NSMenuItem(title: "Link / Login Accounts", action: nil, keyEquivalent: "")
-        linkSectionItem.attributedTitle = NSAttributedString(string: "Link / Login Accounts", attributes: [.font: font])
-        menu.addItem(linkSectionItem)
-        
-        menu.addItem(NSMenuItem(title: "  Log in to Claude Code", action: #selector(onLoginClaude), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "  Log in to Antigravity", action: #selector(onLoginAntigravity), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "  Log in to Command Code", action: #selector(onLoginCommandCode), keyEquivalent: ""))
-        
-        menu.addItem(NSMenuItem.separator())
-        
-        // 4. Control options
+        // 3. Control options
         let refreshItem = NSMenuItem(title: "Refresh Now", action: #selector(onRefresh), keyEquivalent: "r")
         menu.addItem(refreshItem)
         
@@ -514,33 +543,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // MARK: - Link Commands
     
-    func runTerminalCommand(_ command: String) {
-        let scriptContent = """
-        tell application "Terminal"
-            do script "\(command)"
-            activate
-        end tell
-        """
-        if let script = NSAppleScript(source: scriptContent) {
-            var error: NSDictionary?
-            script.executeAndReturnError(&error)
-            if let error = error {
-                print("AppleScript Error: \(error)")
-            }
-        }
-    }
-    
-    @objc func onLoginClaude() {
-        runTerminalCommand("/Users/aashishlal/.local/bin/claude auth")
-    }
-    
-    @objc func onLoginAntigravity() {
-        runTerminalCommand("/opt/homebrew/bin/antigravity-usage login")
-    }
-    
-    @objc func onLoginCommandCode() {
-        runTerminalCommand("/opt/homebrew/bin/cmd login")
-    }
+
     
     @objc func onRefresh() {
         refreshData()

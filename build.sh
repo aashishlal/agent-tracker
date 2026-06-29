@@ -26,7 +26,7 @@ if [ -f "AppIcon.icns" ]; then
     cp AppIcon.icns "${RESOURCES_DIR}/"
 fi
 if [ -d "Icons" ]; then
-    cp -R Icons "${RESOURCES_DIR}/"
+    cp Icons/*.png "${RESOURCES_DIR}/"
 fi
 
 # 3. Move binary

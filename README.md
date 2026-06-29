@@ -4,6 +4,13 @@ A native macOS menu bar application to track daily and weekly usage limits for y
 
 No accounts. No sign-up. Completely private.
 
+## 🔒 Privacy & Security Guarantee
+Agent Tracker is built to run **100% locally**.
+- **No data is ever saved, collected, or transmitted**.
+- There are **no cloud connections, telemetry, or external servers**.
+- The application does not store or prompt for credentials or API keys. It merely runs your local system CLI tools (`claude`, `cmd`, `antigravity-usage`) in read-only mode and displays their output.
+- For complete details, see our dedicated **[PRIVACY.md](PRIVACY.md)**.
+
 ![Agent Tracker Menu Bar Example](https://raw.githubusercontent.com/skainguyen1412/antigravity-usage/main/images/icon.png)
 
 ## Features
