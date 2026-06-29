@@ -238,6 +238,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let task = Process()
         let pipe = Pipe()
         
+        var env = ProcessInfo.processInfo.environment
+        let currentPath = env["PATH"] ?? ""
+        env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:\(currentPath)"
+        task.environment = env
+        
         let projectDir = "/Users/aashishlal/Documents/Agent Tracker"
         if FileManager.default.fileExists(atPath: projectDir) {
             task.currentDirectoryPath = projectDir
@@ -449,6 +454,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func onAddToolDialog() {
         DispatchQueue.main.async {
             let alert = NSAlert()
+            alert.window.level = .floating
             alert.messageText = "Add Custom CLI Tool"
             alert.informativeText = "Enter the configuration details for the new CLI tool:"
             alert.addButton(withTitle: "Add")
@@ -495,6 +501,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         DispatchQueue.main.async {
             let alert = NSAlert()
+            alert.window.level = .floating
             alert.messageText = "Remove Tool"
             alert.informativeText = "Are you sure you want to remove '\(name)' from the tracker?"
             alert.addButton(withTitle: "Remove")
