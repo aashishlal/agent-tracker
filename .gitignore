@@ -1,0 +1,9 @@
+# Build artifacts
+AgentTracker.app/
+AgentTracker.dmg
+AgentTracker
+
+# OS generated files
+.DS_Store
+.Spotlight-V100
+.Trashes
