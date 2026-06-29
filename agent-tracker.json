@@ -16,11 +16,23 @@
     },
     {
       "name": "Antigravity",
-      "command": "/opt/homebrew/bin/antigravity-usage --json",
+      "command": "cd \"/Users/aashishlal/Documents/Agent Tracker\" && /Users/aashishlal/.local/bin/agy -p '/usage' < /dev/null",
       "metrics": [
         {
-          "label": "Prompt Credits",
-          "regex": "\"remainingPercentage\":\\s*([0-9.]+)"
+          "label": "Gemini Weekly",
+          "regex": "GEMINI MODELS(?:(?!CLAUDE)[\\s\\S])*?Weekly Limit[\\s\\S]*?(\\d+%\\s*remaining[^\\n]*|[0-9.]+%|Quota available)"
+        },
+        {
+          "label": "Gemini 5-Hour",
+          "regex": "GEMINI MODELS(?:(?!CLAUDE)[\\s\\S])*?Five Hour Limit[\\s\\S]*?(\\d+%\\s*remaining[^\\n]*|[0-9.]+%|Quota available)"
+        },
+        {
+          "label": "Claude Weekly",
+          "regex": "CLAUDE AND GPT MODELS[\\s\\S]*?Weekly Limit[\\s\\S]*?(\\d+%\\s*remaining[^\\n]*|[0-9.]+%|Quota available)"
+        },
+        {
+          "label": "Claude 5-Hour",
+          "regex": "CLAUDE AND GPT MODELS[\\s\\S]*?Five Hour Limit[\\s\\S]*?(\\d+%\\s*remaining[^\\n]*|[0-9.]+%|Quota available)"
         }
       ]
     },

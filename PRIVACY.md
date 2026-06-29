@@ -12,9 +12,8 @@ Agent Tracker is designed with a **privacy-first, local-only** model. We believe
 - **No Credentials Storage**: Agent Tracker does not prompt you for passwords, API keys, or login details. It has **no account system** and does not write, store, or modify credentials.
 - **CLI Sandbox**: When executing status commands (such as `/opt/homebrew/bin/cmd status`), all subprocesses run with their working directory isolated to the home folder `~`. They communicate directly with your local system CLI binaries, exactly as if you typed them in the terminal.
 
-## 3. Sandboxing & Safe Permissions
-- **Minimal Entitlements**: The application does not request permissions to access your Location, Contacts, Microphone, Camera, Apple Music, or Photo Gallery.
-- **No Gatekeeper Alerts**: When installed and run from the standard macOS `/Applications` directory, the app operates silently within native OS guidelines without displaying intrusive permission sheets.
+- **Documents Folder Access**: The only permission the application requires is access to your **Documents** folder. This is solely because the Command Code CLI (`cmd`) must execute from within a valid git repository context to fetch usage data, which is located in your `~/Documents/` folder. The application does not read any other files and performs zero network actions.
+- **No Gatekeeper Alerts**: When run from the standard macOS `/Applications` directory, the app operates cleanly within macOS security boundaries.
 
 ## 4. Open Source Transparency
 Since Agent Tracker is completely open-source, we encourage you to review the source code directly in **[AgentTracker.swift](AgentTracker.swift)** to verify its safety and local-only nature.

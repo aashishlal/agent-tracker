@@ -51,6 +51,13 @@ cp -R AgentTracker.app /Applications/
 open /Applications/AgentTracker.app
 ```
 
+### 4. 📂 Permissions Required (Important)
+When the app first runs status updates, macOS will display the following security dialog:
+> **"Agent Tracker" would like to access files in your Documents folder.**
+
+*   **Why is this needed?**: The Command Code CLI (`cmd`) requires execution inside a valid git repository workspace to fetch your active usage metrics. Since the tracker repository is cloned inside your `~/Documents/` folder, the app needs read-only execution access to that subdirectory.
+*   **How to grant**: Click **OK** on the macOS dialog. If you clicked "Don't Allow" by mistake, you can enable it by navigating to **System Settings > Privacy & Security > Files and Folders > Agent Tracker** and toggling the **Documents Folder** option on.
+
 ---
 
 ## Configuration
