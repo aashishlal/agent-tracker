@@ -26,12 +26,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var config: Config?
     var toolResults: [String: [String: String]] = [:]
     var isRefreshing = false
+    var hasAlertedClaude = false
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Setup status item
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        
         if let button = statusItem?.button {
-            button.title = "📊 Loading..."
+            // Use SF Symbols "eye" icon (supported in macOS 11.0+)
+            if #available(macOS 11.0, *) {
+                let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
+                if let image = NSImage(systemSymbolName: "eye", accessibilityDescription: "Agent Tracker") {
+                    button.image = image.withSymbolConfiguration(config)
+                    button.imagePosition = .imageOnly
+                } else {
+                    button.title = "👁️"
+                }
+            } else {
+                button.title = "👁️"
+            }
+            button.toolTip = "Agent Tracker - Loading..."
         }
         
         // Load initial config
@@ -62,14 +76,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard !isRefreshing else { return }
         isRefreshing = true
         
-        if let button = statusItem?.button {
-            button.title = "🔄 Refreshing..."
-        }
-        
         // Reload config in case user edited it
         loadConfig()
         
-        guard let config = config, !config.tools.isEmpty else {
+        guard let config = config else {
             self.isRefreshing = false
             self.updateMenu()
             return
@@ -79,6 +89,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         var newResults: [String: [String: String]] = [:]
         let lock = NSLock()
         
+        // Process configured tools
         for tool in config.tools {
             group.enter()
             DispatchQueue.global(qos: .userInitiated).async {
@@ -101,11 +112,48 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         
+        // Fetch Claude Cost directly from JSON file (custom feature)
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            let cost = self.getClaudeCost()
+            lock.lock()
+            if newResults["Claude Code"] == nil {
+                newResults["Claude Code"] = [:]
+            }
+            newResults["Claude Code"]?["Historical Cost"] = cost
+            lock.unlock()
+            group.leave()
+        }
+        
+        // Fetch Codex Logs directly from SQLite database (custom feature)
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            let dbPath = NSString(string: "~/.codex/logs_2.sqlite").expandingTildeInPath
+            var stats = "N/A"
+            if FileManager.default.fileExists(atPath: dbPath) {
+                let output = self.runShell("sqlite3 \(dbPath) \"SELECT count(*), sum(estimated_bytes) FROM logs;\" 2>/dev/null")
+                let parts = output.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: "|")
+                if parts.count == 2, let count = Int(parts[0]), let bytes = Int(parts[1]) {
+                    let kb = bytes / 1024
+                    stats = "\(count) logs (\(kb) KB)"
+                }
+            }
+            lock.lock()
+            if newResults["Codex"] == nil {
+                newResults["Codex"] = [:]
+            }
+            newResults["Codex"]?["Local Activity"] = stats
+            lock.unlock()
+            group.leave()
+        }
+        
         group.notify(queue: DispatchQueue.main) { [weak self] in
             guard let self = self else { return }
             self.toolResults = newResults
             self.isRefreshing = false
+            self.checkAlerts()
             self.updateMenu()
+            self.updateToolTip()
         }
     }
     
@@ -150,11 +198,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             if let match = results.first {
                 if match.numberOfRanges > 1 {
-                    // Return first capture group
                     let range = match.range(at: 1)
                     return nsString.substring(with: range).trimmingCharacters(in: .whitespacesAndNewlines)
                 } else {
-                    // Return full match
                     let range = match.range(at: 0)
                     return nsString.substring(with: range).trimmingCharacters(in: .whitespacesAndNewlines)
                 }
@@ -165,13 +211,79 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return nil
     }
     
+    func getClaudeCost() -> String {
+        let path = NSString(string: "~/.claude.json").expandingTildeInPath
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else {
+            return "N/A"
+        }
+        
+        struct ClaudeJson: Decodable {
+            struct Project: Decodable {
+                let lastCost: Double?
+            }
+            let projects: [String: Project]?
+        }
+        
+        do {
+            let decoded = try JSONDecoder().decode(ClaudeJson.self, from: data)
+            if let projects = decoded.projects {
+                let totalCost = projects.values.compactMap { $0.lastCost }.reduce(0.0, +)
+                return String(format: "$%.2f", totalCost)
+            }
+        } catch {
+            print("Error decoding Claude JSON: \(error)")
+        }
+        return "N/A"
+    }
+    
+    func checkAlerts() {
+        if let claudeMetrics = toolResults["Claude Code"], let weekly = claudeMetrics["Weekly Usage"] {
+            // Check if usage exceeds 90% (extract digits)
+            let digits = weekly.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
+            if let pct = Int(digits), pct >= 90 {
+                if !hasAlertedClaude {
+                    sendNotification(title: "Claude Limit Warning", text: "Claude Code weekly usage has reached \(weekly)!")
+                    hasAlertedClaude = true
+                }
+            } else {
+                hasAlertedClaude = false
+            }
+        }
+    }
+    
+    func sendNotification(title: String, text: String) {
+        let notification = NSUserNotification()
+        notification.title = title
+        notification.informativeText = text
+        notification.soundName = NSUserNotificationDefaultSoundName
+        NSUserNotificationCenter.default.deliver(notification)
+    }
+    
+    func updateToolTip() {
+        var tooltipParts: [String] = ["Agent Tracker - Hover Details"]
+        
+        let sortedKeys = toolResults.keys.sorted()
+        for key in sortedKeys {
+            if let metrics = toolResults[key] {
+                tooltipParts.append("\n\(key):")
+                for (label, value) in metrics {
+                    tooltipParts.append("  • \(label): \(value)")
+                }
+            }
+        }
+        
+        statusItem?.button?.toolTip = tooltipParts.joined(separator: "\n")
+    }
+    
     func updateMenu() {
         menu.removeAllItems()
         
         // 1. Summary details of each tool
         if let config = config {
             var totalToolsAdded = 0
-            for tool in config.tools {
+            let sortedTools = config.tools.sorted(by: { $0.name < $1.name })
+            
+            for tool in sortedTools {
                 let toolItem = NSMenuItem(title: tool.name, action: nil, keyEquivalent: "")
                 let font = NSFont.boldSystemFont(ofSize: 13)
                 let attributes: [NSAttributedString.Key: Any] = [.font: font]
@@ -179,7 +291,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 menu.addItem(toolItem)
                 
                 if let metrics = toolResults[tool.name] {
-                    for (label, value) in metrics {
+                    // Sort metric labels to keep them consistent
+                    let sortedMetrics = metrics.sorted(by: { $0.key < $1.key })
+                    for (label, value) in sortedMetrics {
                         let metricItem = NSMenuItem(title: "  \(label): \(value)", action: nil, keyEquivalent: "")
                         menu.addItem(metricItem)
                     }
@@ -191,13 +305,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 totalToolsAdded += 1
             }
             
-            if totalToolsAdded == 0 {
-                menu.addItem(NSMenuItem(title: "No tools configured", action: nil, keyEquivalent: ""))
+            // Add Codex explicitly if it was parsed but not in config
+            if totalToolsAdded > 0 && toolResults["Codex"] != nil && !config.tools.contains(where: { $0.name == "Codex" }) {
+                let toolItem = NSMenuItem(title: "Codex", action: nil, keyEquivalent: "")
+                let font = NSFont.boldSystemFont(ofSize: 13)
+                toolItem.attributedTitle = NSAttributedString(string: "Codex", attributes: [.font: font])
+                menu.addItem(toolItem)
+                if let metrics = toolResults["Codex"] {
+                    for (label, value) in metrics {
+                        menu.addItem(NSMenuItem(title: "  \(label): \(value)", action: nil, keyEquivalent: ""))
+                    }
+                }
                 menu.addItem(NSMenuItem.separator())
             }
         }
         
-        // 2. Control options
+        // 2. Link Accounts section (custom feature)
+        let linkSectionItem = NSMenuItem(title: "Link / Login Accounts", action: nil, keyEquivalent: "")
+        let font = NSFont.boldSystemFont(ofSize: 12)
+        linkSectionItem.attributedTitle = NSAttributedString(string: "Link / Login Accounts", attributes: [.font: font])
+        menu.addItem(linkSectionItem)
+        
+        menu.addItem(NSMenuItem(title: "  Log in to Claude Code", action: #selector(onLoginClaude), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "  Log in to Antigravity", action: #selector(onLoginAntigravity), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "  Log in to Command Code", action: #selector(onLoginCommandCode), keyEquivalent: ""))
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        // 3. Control options
         let refreshItem = NSMenuItem(title: "Refresh Now", action: #selector(onRefresh), keyEquivalent: "r")
         menu.addItem(refreshItem)
         
@@ -210,18 +345,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(quitItem)
         
         statusItem?.menu = menu
-        
-        // Update menu bar title with summary
-        if let button = statusItem?.button {
-            var summary = "📊 Agent Limits"
-            
-            // Look for weekly usage of Claude to display in main bar as quick indicator
-            if let claudeMetrics = toolResults["Claude Code"], let weekly = claudeMetrics["Weekly Usage"] {
-                summary = "📊 Claude: \(weekly)"
+    }
+    
+    func runTerminalCommand(_ command: String) {
+        let scriptContent = """
+        tell application "Terminal"
+            do script "\(command)"
+            activate
+        end tell
+        """
+        if let script = NSAppleScript(source: scriptContent) {
+            var error: NSDictionary?
+            script.executeAndReturnError(&error)
+            if let error = error {
+                print("AppleScript Error: \(error)")
             }
-            
-            button.title = summary
         }
+    }
+    
+    @objc func onLoginClaude() {
+        runTerminalCommand("/Users/aashishlal/.local/bin/claude auth")
+    }
+    
+    @objc func onLoginAntigravity() {
+        runTerminalCommand("/opt/homebrew/bin/antigravity-usage login")
+    }
+    
+    @objc func onLoginCommandCode() {
+        runTerminalCommand("/opt/homebrew/bin/cmd login")
     }
     
     @objc func onRefresh() {
@@ -247,7 +398,7 @@ let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate
 
-// Hide icon from Dock since it is a menu bar only app
+// Hide icon from Dock
 app.setActivationPolicy(.accessory)
 
 app.run()
