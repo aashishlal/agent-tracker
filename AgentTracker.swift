@@ -3,18 +3,18 @@ import Foundation
 
 // MARK: - Models
 
-struct Metric: Decodable {
+struct Metric: Codable {
     let label: String
     let regex: String
 }
 
-struct Tool: Decodable {
+struct Tool: Codable {
     let name: String
     let command: String
     let metrics: [Metric]
 }
 
-struct Config: Decodable {
+struct Config: Codable {
     let tools: [Tool]
 }
 
@@ -33,18 +33,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem?.button {
-            // Use SF Symbols "eye" icon (supported in macOS 11.0+)
-            if #available(macOS 11.0, *) {
-                let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
-                if let image = NSImage(systemSymbolName: "eye", accessibilityDescription: "Agent Tracker") {
-                    button.image = image.withSymbolConfiguration(config)
-                    button.imagePosition = .imageOnly
-                } else {
-                    button.title = "👁️"
-                }
-            } else {
-                button.title = "👁️"
-            }
+            button.imagePosition = .imageOnly
+            setButtonImage(open: false)
+            
+            // Setup tracking area for hover state
+            let trackingArea = NSTrackingArea(rect: button.bounds,
+                                              options: [.mouseEnteredAndExited, .activeAlways],
+                                              owner: self,
+                                              userInfo: nil)
+            button.addTrackingArea(trackingArea)
             button.toolTip = "Agent Tracker - Loading..."
         }
         
@@ -54,10 +51,53 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Initial refresh
         refreshData()
         
-        // Setup timer to refresh every 10 minutes (600 seconds)
+        // Setup timer to refresh every 10 minutes
         Timer.scheduledTimer(withTimeInterval: 600.0, repeats: true) { [weak self] _ in
             self?.refreshData()
         }
+    }
+    
+    func setButtonImage(open: Bool) {
+        guard let button = statusItem?.button else { return }
+        let imageName = open ? "Open" : "Closed"
+        
+        // 1. Try loading from main bundle resources
+        if let image = Bundle.main.image(forResource: imageName) {
+            image.isTemplate = true
+            button.image = image
+            return
+        }
+        
+        // 2. Try loading from bundle resources subpath (compiled .app/Contents/Resources/Icons/)
+        if let resourcesPath = Bundle.main.resourcePath {
+            let path = (resourcesPath as NSString).appendingPathComponent("Icons/\(imageName).png")
+            if FileManager.default.fileExists(atPath: path), let image = NSImage(contentsOfFile: path) {
+                image.isTemplate = true
+                button.image = image
+                return
+            }
+        }
+        
+        // 3. Try loading from local path (for dev fallback)
+        let devPath = "/Users/aashishlal/Documents/Agent Tracker/Icons/\(imageName).png"
+        if FileManager.default.fileExists(atPath: devPath), let image = NSImage(contentsOfFile: devPath) {
+            image.isTemplate = true
+            button.image = image
+            return
+        }
+        
+        // 4. Fallback emoji if files missing
+        button.image = nil
+        button.title = open ? "👁️" : "🫵"
+    }
+    
+    // Mouse hover tracking
+    @objc func mouseEntered(with event: NSEvent) {
+        setButtonImage(open: true)
+    }
+    
+    @objc func mouseExited(with event: NSEvent) {
+        setButtonImage(open: false)
     }
     
     func loadConfig() {
@@ -76,7 +116,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard !isRefreshing else { return }
         isRefreshing = true
         
-        // Reload config in case user edited it
         loadConfig()
         
         guard let config = config else {
@@ -89,7 +128,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         var newResults: [String: [String: String]] = [:]
         let lock = NSLock()
         
-        // Process configured tools
         for tool in config.tools {
             group.enter()
             DispatchQueue.global(qos: .userInitiated).async {
@@ -112,7 +150,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         
-        // Fetch Claude Cost directly from JSON file (custom feature)
+        // Fetch Claude Cost directly from JSON file
         group.enter()
         DispatchQueue.global(qos: .userInitiated).async {
             let cost = self.getClaudeCost()
@@ -125,7 +163,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             group.leave()
         }
         
-        // Fetch Codex Logs directly from SQLite database (custom feature)
+        // Fetch Codex Logs directly from SQLite database
         group.enter()
         DispatchQueue.global(qos: .userInitiated).async {
             let dbPath = NSString(string: "~/.codex/logs_2.sqlite").expandingTildeInPath
@@ -166,9 +204,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         task.arguments = ["-c", command]
         task.launchPath = "/bin/zsh"
         
-        // Timeout handling
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global())
-        timer.schedule(deadline: .now() + 15.0) // 15 seconds timeout
+        timer.schedule(deadline: .now() + 15.0)
         timer.setEventHandler {
             if task.isRunning {
                 task.terminate()
@@ -238,7 +275,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     func checkAlerts() {
         if let claudeMetrics = toolResults["Claude Code"], let weekly = claudeMetrics["Weekly Usage"] {
-            // Check if usage exceeds 90% (extract digits)
             let digits = weekly.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
             if let pct = Int(digits), pct >= 90 {
                 if !hasAlertedClaude {
@@ -291,7 +327,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 menu.addItem(toolItem)
                 
                 if let metrics = toolResults[tool.name] {
-                    // Sort metric labels to keep them consistent
                     let sortedMetrics = metrics.sorted(by: { $0.key < $1.key })
                     for (label, value) in sortedMetrics {
                         let metricItem = NSMenuItem(title: "  \(label): \(value)", action: nil, keyEquivalent: "")
@@ -320,9 +355,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         
-        // 2. Link Accounts section (custom feature)
-        let linkSectionItem = NSMenuItem(title: "Link / Login Accounts", action: nil, keyEquivalent: "")
+        // 2. Settings / Edit Configuration in Menu (New Feature)
+        let settingsHeader = NSMenuItem(title: "Configuration", action: nil, keyEquivalent: "")
         let font = NSFont.boldSystemFont(ofSize: 12)
+        settingsHeader.attributedTitle = NSAttributedString(string: "Configuration", attributes: [.font: font])
+        menu.addItem(settingsHeader)
+        
+        menu.addItem(NSMenuItem(title: "  Add Custom CLI Tool...", action: #selector(onAddToolDialog), keyEquivalent: ""))
+        
+        // Remove Tool Submenu
+        let removeSubmenu = NSMenu()
+        if let config = config, !config.tools.isEmpty {
+            for tool in config.tools {
+                let removeToolItem = NSMenuItem(title: "Remove \(tool.name)", action: #selector(onRemoveToolItem(_:)), keyEquivalent: "")
+                removeToolItem.representedObject = tool.name
+                removeSubmenu.addItem(removeToolItem)
+            }
+        } else {
+            removeSubmenu.addItem(NSMenuItem(title: "No tools configured", action: nil, keyEquivalent: ""))
+        }
+        
+        let removeItem = NSMenuItem(title: "  Remove Custom CLI Tool", action: nil, keyEquivalent: "")
+        removeItem.submenu = removeSubmenu
+        menu.addItem(removeItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        // 3. Link Accounts section
+        let linkSectionItem = NSMenuItem(title: "Link / Login Accounts", action: nil, keyEquivalent: "")
         linkSectionItem.attributedTitle = NSAttributedString(string: "Link / Login Accounts", attributes: [.font: font])
         menu.addItem(linkSectionItem)
         
@@ -332,11 +392,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
-        // 3. Control options
+        // 4. Control options
         let refreshItem = NSMenuItem(title: "Refresh Now", action: #selector(onRefresh), keyEquivalent: "r")
         menu.addItem(refreshItem)
         
-        let configItem = NSMenuItem(title: "Edit Configuration", action: #selector(onEditConfig), keyEquivalent: "e")
+        let configItem = NSMenuItem(title: "Open Configuration JSON", action: #selector(onEditConfig), keyEquivalent: "e")
         menu.addItem(configItem)
         
         menu.addItem(NSMenuItem.separator())
@@ -346,6 +406,110 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         statusItem?.menu = menu
     }
+    
+    // MARK: - Dynamic Configuration Actions
+    
+    @objc func onAddToolDialog() {
+        let alert = NSAlert()
+        alert.messageText = "Add Custom CLI Tool"
+        alert.informativeText = "Enter the configuration details for the new CLI tool:"
+        alert.addButton(withTitle: "Add")
+        alert.addButton(withTitle: "Cancel")
+        
+        // Create form view
+        let nameField = NSTextField(frame: NSRect(x: 0, y: 90, width: 280, height: 24))
+        nameField.placeholderString = "Tool Name (e.g. Claude Code)"
+        
+        let cmdField = NSTextField(frame: NSRect(x: 0, y: 60, width: 280, height: 24))
+        cmdField.placeholderString = "CLI Command (e.g. /usr/local/bin/my-tool --usage)"
+        
+        let labelField = NSTextField(frame: NSRect(x: 0, y: 30, width: 280, height: 24))
+        labelField.placeholderString = "Metric Label (e.g. Daily limit)"
+        
+        let regexField = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
+        regexField.placeholderString = "Regex to extract value (e.g. (\\d+%))"
+        
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: 114))
+        container.addSubview(nameField)
+        container.addSubview(cmdField)
+        container.addSubview(labelField)
+        container.addSubview(regexField)
+        
+        alert.accessoryView = container
+        
+        // Activate app to bring dialog to front
+        NSApp.activate(ignoringOtherApps: true)
+        
+        if alert.runModal() == .alertFirstButtonReturn {
+            let name = nameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            let command = cmdField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            let label = labelField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            let regex = regexField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            if !name.isEmpty && !command.isEmpty && !label.isEmpty && !regex.isEmpty {
+                addToolToConfig(name: name, command: command, label: label, regex: regex)
+            }
+        }
+    }
+    
+    @objc func onRemoveToolItem(_ sender: NSMenuItem) {
+        guard let name = sender.representedObject as? String else { return }
+        
+        let alert = NSAlert()
+        alert.messageText = "Remove Tool"
+        alert.informativeText = "Are you sure you want to remove '\(name)' from the tracker?"
+        alert.addButton(withTitle: "Remove")
+        alert.addButton(withTitle: "Cancel")
+        
+        NSApp.activate(ignoringOtherApps: true)
+        
+        if alert.runModal() == .alertFirstButtonReturn {
+            removeToolFromConfig(name: name)
+        }
+    }
+    
+    func addToolToConfig(name: String, command: String, label: String, regex: String) {
+        loadConfig()
+        guard let currentConfig = config else { return }
+        
+        let newMetric = Metric(label: label, regex: regex)
+        let newTool = Tool(name: name, command: command, metrics: [newMetric])
+        
+        var updatedTools = currentConfig.tools
+        updatedTools.removeAll(where: { $0.name == name })
+        updatedTools.append(newTool)
+        
+        let newConfig = Config(tools: updatedTools)
+        saveConfigToDisk(newConfig)
+        refreshData()
+    }
+    
+    func removeToolFromConfig(name: String) {
+        loadConfig()
+        guard let currentConfig = config else { return }
+        
+        var updatedTools = currentConfig.tools
+        updatedTools.removeAll(where: { $0.name == name })
+        
+        let newConfig = Config(tools: updatedTools)
+        saveConfigToDisk(newConfig)
+        refreshData()
+    }
+    
+    func saveConfigToDisk(_ newConfig: Config) {
+        let configPath = NSString(string: "~/.agent-tracker.json").expandingTildeInPath
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .prettyPrinted
+            let data = try encoder.encode(newConfig)
+            try data.write(to: URL(fileURLWithPath: configPath))
+            self.config = newConfig
+        } catch {
+            print("Failed to save config: \(error)")
+        }
+    }
+    
+    // MARK: - Link Commands
     
     func runTerminalCommand(_ command: String) {
         let scriptContent = """

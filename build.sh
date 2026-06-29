@@ -19,6 +19,9 @@ swiftc -o "${APP_NAME}" -framework Cocoa AgentTracker.swift
 # 2. Create app bundle structure
 echo "Creating application bundle..."
 mkdir -p "${MAC_OS_DIR}" "${RESOURCES_DIR}"
+if [ -d "Icons" ]; then
+    cp -R Icons "${RESOURCES_DIR}/"
+fi
 
 # 3. Move binary
 mv "${APP_NAME}" "${MAC_OS_DIR}/${APP_NAME}"
