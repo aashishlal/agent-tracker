@@ -26,11 +26,19 @@
     },
     {
       "name": "Command Code",
-      "command": "/opt/homebrew/bin/cmd status",
+      "command": "cd \"/Users/aashishlal/Documents/Agent Tracker\" && /opt/homebrew/bin/cmd -p '/usage' < /dev/null",
       "metrics": [
         {
-          "label": "Auth Status",
-          "regex": "Authenticated as ([a-zA-Z0-9_-]+)"
+          "label": "Cycle Usage",
+          "regex": "([0-9]+%) used"
+        },
+        {
+          "label": "Weekly Limit",
+          "regex": "Weekly\\s+[^\\n]*?([0-9]+%)"
+        },
+        {
+          "label": "5-hour Limit",
+          "regex": "5-hour\\s+[^\\n]*?([0-9]+%)"
         }
       ]
     }

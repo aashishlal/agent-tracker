@@ -135,8 +135,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 var metricsResults: [String: String] = [:]
                 
                 let cleanedOutput = output.trimmingCharacters(in: .whitespacesAndNewlines)
-                if tool.name == "Antigravity" && cleanedOutput.hasPrefix("{") {
-                    if let data = cleanedOutput.data(using: .utf8) {
+                if tool.name == "Antigravity", let startIdx = cleanedOutput.firstIndex(of: "{") {
+                    let jsonString = String(cleanedOutput[startIdx...])
+                    if let data = jsonString.data(using: .utf8) {
                         struct AgyModel: Decodable {
                             let label: String
                             let modelId: String
