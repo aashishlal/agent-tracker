@@ -399,6 +399,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let configItem = NSMenuItem(title: "Open Configuration JSON", action: #selector(onEditConfig), keyEquivalent: "e")
         menu.addItem(configItem)
         
+        let updateItem = NSMenuItem(title: "Check for Updates...", action: #selector(onCheckForUpdates), keyEquivalent: "u")
+        menu.addItem(updateItem)
+        
         menu.addItem(NSMenuItem.separator())
         
         let quitItem = NSMenuItem(title: "Quit", action: #selector(onQuit), keyEquivalent: "q")
@@ -553,6 +556,71 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc func onQuit() {
         NSApplication.shared.terminate(self)
+    }
+    
+    @objc func onCheckForUpdates() {
+        checkForUpdates(isManual: true)
+    }
+    
+    func checkForUpdates(isManual: Bool) {
+        let plistUrl = URL(string: "https://raw.githubusercontent.com/aashishlal/agent-tracker/main/Info.plist")!
+        
+        let task = URLSession.shared.dataTask(with: plistUrl) { [weak self] data, response, error in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                guard error == nil, let data = data else {
+                    if isManual {
+                        self.showUpdateAlert(title: "Update Check Failed", text: "Failed to connect to update server. Please check your internet connection.")
+                    }
+                    return
+                }
+                
+                guard let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] else {
+                    if isManual {
+                        self.showUpdateAlert(title: "Update Check Failed", text: "Failed to parse update information.")
+                    }
+                    return
+                }
+                
+                if let remoteVersionStr = plist["CFBundleShortVersionString"] as? String,
+                   let remoteBuildStr = plist["CFBundleVersion"] as? String,
+                   let localVersionStr = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+                   let localBuildStr = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String {
+                    
+                    let hasUpdate = remoteVersionStr != localVersionStr || remoteBuildStr != localBuildStr
+                    
+                    if hasUpdate {
+                        let alert = NSAlert()
+                        alert.messageText = "Update Available"
+                        alert.informativeText = "A new version of Agent Tracker is available!\n\nLocal: v\(localVersionStr) (Build \(localBuildStr))\nLatest: v\(remoteVersionStr) (Build \(remoteBuildStr))\n\nWould you like to open the GitHub repository to download the latest release?"
+                        alert.addButton(withTitle: "Download")
+                        alert.addButton(withTitle: "Cancel")
+                        
+                        NSApp.activate(ignoringOtherApps: true)
+                        if alert.runModal() == .alertFirstButtonReturn {
+                            if let url = URL(string: "https://github.com/aashishlal/agent-tracker") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                    } else {
+                        if isManual {
+                            self.showUpdateAlert(title: "Up to Date", text: "You are running the latest version (v\(localVersionStr)).")
+                        }
+                    }
+                }
+            }
+        }
+        task.resume()
+    }
+    
+    func showUpdateAlert(title: String, text: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = text
+        alert.addButton(withTitle: "OK")
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
     }
 }
 
