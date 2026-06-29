@@ -11,11 +11,11 @@ TEMP_DIR="/tmp/agent_tracker_dmg_source"
 
 echo "=== Packaging ${APP_NAME} into a DMG ==="
 
-# 1. Ensure the app has been built first
-if [ ! -d "${APP_DIR}" ]; then
-    echo "Error: ${APP_DIR} does not exist. Running build.sh first..."
-    ./build.sh
-fi
+# 1. Clean the old build directory and rebuild
+echo "Cleaning old app build..."
+rm -rf "${APP_DIR}"
+echo "Running build.sh to compile fresh binary and pack assets..."
+./build.sh
 
 # 2. Set up temporary directory for the DMG contents
 echo "Preparing temporary directory..."
