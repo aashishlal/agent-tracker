@@ -1,108 +1,80 @@
-# Agent Tracker 📊
+# Agent Tracker
 
-A native macOS menu bar application to track daily and weekly usage limits for your AI coding assistants (Claude Code, Antigravity, Command Code, and more) 100% locally.
+A macOS menu bar app that tracks usage and limits across your AI coding tools — locally, no accounts needed.
 
-No accounts. No sign-up. Completely private.
+Each metric shows a colour-coded progress bar that turns orange (≥85% consumed) or red (≥95%). Refreshes every 10 minutes.
 
-## 🔒 Privacy & Security Guarantee
-Agent Tracker is built to run **100% locally**.
-- **No data is ever saved, collected, or transmitted**.
-- There are **no cloud connections, telemetry, or external servers**.
-- The application does not store or prompt for credentials or API keys. It merely runs your local system CLI tools (`claude`, `cmd`, `antigravity-usage`) in read-only mode and displays their output.
-- For complete details, see our dedicated **[PRIVACY.md](PRIVACY.md)**.
+## Supported tools
 
-![Agent Tracker Menu Bar Example](https://raw.githubusercontent.com/skainguyen1412/antigravity-usage/main/images/icon.png)
+| Tool | Data source | Metrics |
+|------|-------------|---------|
+| **Claude Code** | `claude -p '/usage'` | Weekly % used, Session % used |
+| **Antigravity** | Local cache file | 5-Hour & Weekly limits + reset times |
+| **Codex** | `~/.codex/logs_2.sqlite` | Log count & storage |
+| **Command Code** | Local JSONL session files | Session & message count |
+| **Kimi** | PTY `/usage` capture | Weekly & 5-Hour limits + reset times |
 
-## Features
-- **Menu Bar Indicator**: Shows your active Claude Code usage right in the status bar (e.g. `📊 Claude: 91% used`).
-- **Accessory App**: Runs quietly in the background without cluttering your Dock.
-- **Asynchronous Execution**: Checks limits in background threads without blocking your macOS interface.
-- **Auto-Refresh**: Polls the limits automatically every 10 minutes.
-- **Fully Extensible**: Add any command-line tool or script by configuring it in a simple JSON file.
+## Requirements
 
----
+- macOS 10.13+
+- Xcode Command Line Tools: `xcode-select --install`
+- The CLI tools you want to track, already installed and authenticated
 
-## Getting Started
-
-### 1. Requirements
-- macOS 10.13 or newer.
-- Swift compiler (pre-installed with Xcode Command Line Tools).
-
-### 2. Installation & Build
-Clone the repository and build the `.app` bundle:
+## Install
 
 ```bash
-git clone https://github.com/aashishlal/agent-tracker.git
+git clone https://github.com/yourusername/agent-tracker
 cd agent-tracker
-./build.sh
-```
-
-This compiles the Swift source and creates `AgentTracker.app`.
-
-### 3. Run
-You can launch the app directly:
-```bash
+bash build.sh
 open AgentTracker.app
 ```
 
-Or copy it to your Applications directory for easy access via Spotlight:
-```bash
-cp -R AgentTracker.app /Applications/
-open /Applications/AgentTracker.app
-```
+To launch at login: **System Settings → General → Login Items → +** and add `AgentTracker.app`.
 
-### 4. 📂 Permissions Required (Important)
-When the app first runs status updates, macOS will display the following security dialog:
-> **"Agent Tracker" would like to access files in your Documents folder.**
+## Add your own tools
 
-*   **Why is this needed?**: The Command Code CLI (`cmd`) requires execution inside a valid git repository workspace to fetch your active usage metrics. Since the tracker repository is cloned inside your `~/Documents/` folder, the app needs read-only execution access to that subdirectory.
-*   **How to grant**: Click **OK** on the macOS dialog. If you clicked "Don't Allow" by mistake, you can enable it by navigating to **System Settings > Privacy & Security > Files and Folders > Agent Tracker** and toggling the **Documents Folder** option on.
+Click the menu bar icon → **Add Tool…** to pick a built-in preset or enter a custom command.
 
----
+Config lives at `~/.agent-tracker.json`. Edit it directly and hit **Refresh Now** (⌘R) to reload:
 
-## Configuration
-
-The application is configured using a local file at `~/.agent-tracker.json`.
-
-If the file does not exist, a default template will be created for you on first build, preset with hooks for:
-- **Claude Code** (`claude -p "/usage"`)
-- **Antigravity** (`antigravity-usage --json`)
-- **Command Code** (`cmd status`)
-
-### Customizing Tools
-To add a new tool or edit how the values are extracted, click **Edit Configuration** in the status bar menu. It will open `~/.agent-tracker.json` in your default editor.
-
-For each tool, specify:
-1. `name`: Display name in the dropdown menu.
-2. `command`: The terminal command to execute to get status.
-3. `metrics`: A list of values to pull, each with a `label` and a `regex` expression to extract the matched group from the command's stdout.
-
-Example configuration for Claude Code:
 ```json
 {
-  "name": "Claude Code",
-  "command": "/Users/YOUR_USER/.local/bin/claude -p '/usage' < /dev/null",
-  "metrics": [
+  "tools": [
     {
-      "label": "Weekly Usage",
-      "regex": "Current week \\(all models\\): ([^·\\n]+)"
+      "name": "My Tool",
+      "command": "/usr/local/bin/mytool --status",
+      "metrics": [
+        { "label": "Weekly", "regex": "weekly usage: (\\d+%)" }
+      ]
     }
   ]
 }
 ```
 
-*Note: Always use absolute paths for CLI binaries (e.g. `/Users/YOUR_USER/.local/bin/claude` or `/opt/homebrew/bin/cmd`) because background menu bar apps may not inherit your terminal's full shell PATH.*
+> **Tip:** Use absolute paths for binaries — menu bar apps don't inherit your shell's `$PATH`.
 
----
+## Build
 
-## Development & Modification
-The main code is structured in a single Swift file for simplicity:
-- `AgentTracker.swift`: Cocoa `NSApplication` setup, background process spawning, regular expression extraction, and TUI menu updates.
-- `Info.plist`: Tells macOS not to show the app in the Dock (`LSUIElement: true`).
+```bash
+bash build.sh      # compiles AgentTracker.swift → AgentTracker.app
+bash package.sh    # wraps it in a .dmg (optional)
+```
 
-To modify and recompile the app, edit `AgentTracker.swift` and rerun `./build.sh`.
+Single Swift source file, no Xcode project required.
 
----
+## Keyboard shortcuts
+
+| Action | Shortcut |
+|--------|----------|
+| Refresh Now | ⌘R |
+| Open Config JSON | ⌘E |
+| Check for Updates | ⌘U |
+| Quit | ⌘Q |
+
+## Privacy
+
+Runs 100% locally. No network calls, no telemetry, no credentials stored. It reads output from your local CLI tools and local cache files only.
 
 ## License
-MIT License.
+
+MIT

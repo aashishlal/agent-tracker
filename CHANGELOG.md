@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.3.0] - 2026-06-29
+
+### Added
+- **Reset Time Display**: Now shows when limits will reset for both Antigravity and Claude Code.
+- **Antigravity Cache Reader**: Reads from local cache file for instant, reliable usage data.
+- **ASCII Bar Charts**: Visual bar charts using `█` and `░` characters on the right side of values.
+
+### Changed
+- **Simplified Layout**: Removed Command Code (can't get usage data), shows only working tools.
+- **Simplified Antigravity Display**: Shows only "5-Hour Limit" and "Weekly Limit" with reset times.
+
+### Fixed
+- **Crash Fix**: Fixed negative count error in ASCII chart generation.
+- **Antigravity Data Fetching**: Resolved timeout issue by reading from local cache file.
+- **Reset Time Extraction**: Added regex to extract reset times from Claude Code output.
+
+### Removed
+- **Command Code**: Removed from display since CLI doesn't provide usage metrics in non-interactive mode.
+- **Debug Menu Items**: Removed to simplify the interface.
+
 ## [1.2.0] - 2026-06-29
 
 ### Added
